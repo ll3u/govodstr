@@ -252,6 +252,12 @@ func renderFolderIndex(w http.ResponseWriter, r *http.Request, subDir string) {
 		if f.IsDir() {
 			folders = append(folders, RepoItem{Name: name, FullPath: relPath, IsDir: true})
 		} else if strings.HasSuffix(strings.ToLower(name), ".mp4") {
+
+			// skip broken or empty video
+			if info, err := f.Info(); err == nil && info.Size() < 1024*1024 {
+				continue
+			}
+
 			escapedURLPath := pathEscapeURI(relPath)
 			streamUrl := fmt.Sprintf("%s/stream/%s", hostUrl, escapedURLPath)
 
@@ -315,6 +321,12 @@ func generateFolderPlaylist(w http.ResponseWriter, r *http.Request, subDir strin
 	sb.WriteString("#EXTM3U\n")
 	for _, f := range files {
 		if !f.IsDir() && strings.HasSuffix(strings.ToLower(f.Name()), ".mp4") {
+
+			// skip broken or empty video
+			if info, err := f.Info(); err == nil && info.Size() < 1024*1024 {
+				continue
+			}
+
 			relPath := f.Name()
 			if subDir != "" {
 				relPath = subDir + "/" + f.Name()
@@ -454,8 +466,12 @@ func loadOrUpdateFolderCache(targetDir string, files []os.DirEntry) FolderCache 
 		if f.IsDir() || !strings.HasSuffix(strings.ToLower(f.Name()), ".mp4") {
 			continue
 		}
-		name := f.Name()
+		// skip broken or empty files
+		if info, err := f.Info(); err == nil && info.Size() < 1024*1024 {
+			continue
+		}
 
+		name := f.Name()
 		if _, exists := cache[name]; !exists {
 			if scannedThisRun >= 10 {
 				continue

@@ -1,0 +1,7 @@
+/thumbnail_cache/
+/vod/
+.data.json
+*.exe
+*.exe~
+.vscode/
+.idea/
