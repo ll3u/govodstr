@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-const appVersion = "v1.0.3"
+const appVersion = "v1.0.4"
 
 // global config
 var (
@@ -359,7 +359,7 @@ func handleThumbnail(w http.ResponseWriter, r *http.Request) {
 
 	fileName, err := url.QueryUnescape(escapedName)
 	if err != nil || fileName == "" || strings.Contains(fileName, "..") {
-		http.Error(w, "Ungültig", http.StatusBadRequest)
+		http.Error(w, "invalid", http.StatusBadRequest)
 		return
 	}
 
@@ -375,12 +375,12 @@ func handleThumbnail(w http.ResponseWriter, r *http.Request) {
 	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
 		videoPath := filepath.Join(videoDir, fileName)
 
-		cmd := exec.Command("ffmpeg", "-y", "-i", videoPath, "-ss", "00:00:01", "-vframes", "1", "-threads", "1", "-q:v", "5", cachePath)
+		cmd := exec.Command("ffmpeg", "-y", "-i", videoPath, "-ss", "00:00:04", "-vframes", "1", "-threads", "1", "-q:v", "5", cachePath)
 
 		output, err := cmd.CombinedOutput()
 		if err != nil {
-			fmt.Printf("❌ FFmpeg-Fehler für [%s]: %v\n", fileName, err)
-			fmt.Printf("📋 Output: %s\n", string(output))
+			fmt.Printf("❌ FFmpeg error [%s]: %v\n", fileName, err)
+			fmt.Printf("📋 output: %s\n", string(output))
 		}
 	}
 	thumbnailMutex.Unlock()
@@ -388,7 +388,7 @@ func handleThumbnail(w http.ResponseWriter, r *http.Request) {
 	if _, err := os.Stat(cachePath); err == nil {
 		http.ServeFile(w, r, cachePath)
 	} else {
-		http.Error(w, "Thumbnail nicht verfügbar", http.StatusInternalServerError)
+		http.Error(w, "thumbnail unavailable", http.StatusInternalServerError)
 	}
 }
 
