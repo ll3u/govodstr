@@ -95,11 +95,33 @@ const htmlTemplate = `
         .meta-text { display: flex; flex-direction: column; gap: 1px; }
         .title { font-size: 0.85rem; font-weight: 600; color: #fff; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 2.3rem; line-height: 1.3; }
         .artist { font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+		.breadcrumbs { 
+            font-size: 0.8rem; 
+            color: var(--text-muted); 
+            font-family: monospace; 
+            background: #1a1a22; 
+            padding: 4px 8px; 
+            border-radius: 4px; 
+            display: inline-flex; 
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 4px; 
+        }
+        .breadcrumbs a { color: var(--accent-blue); text-decoration: none; font-weight: 600; }
+        .breadcrumbs a:hover { text-decoration: underline; }
+        .breadcrumbs span.separator { color: #4b5563; margin: 0 2px; }
+        .breadcrumbs span.current-folder { color: var(--text-main); font-weight: 600; }
     </style>
 </head>
 <body>
     <header>
-        <div class="current-dir">/{{if .CurrentDir}}{{.CurrentDir}}{{end}}</div>
+        <div class="breadcrumbs">
+            {{range $index, $bc := .Breadcrumbs}}
+                {{if $index}}<span class="separator">/</span>{{end}}
+                <a href="/{{$bc.Path}}">{{$bc.Name}}</a>
+            {{end}}
+        </div>
     </header>
     <div class="playlist-info">
         <a href="{{.BaseURL}}/{{.CurrentDir}}playlist.m3u8"><code>{{.BaseURL}}/{{.CurrentDir}}playlist.m3u8</code></a>
@@ -153,6 +175,11 @@ type FFProbeOutput struct {
 			Artist string `json:"artist"`
 		} `json:"tags"`
 	} `json:"format"`
+}
+
+type Breadcrumb struct {
+	Name string
+	Path string
 }
 
 type ThrottledReadSeekCloser struct {
@@ -288,13 +315,36 @@ func renderFolderIndex(w http.ResponseWriter, r *http.Request, subDir string) {
 		currentURLPath = currentURLPath + "/"
 	}
 
+	var breadcrumbs []Breadcrumb
+	breadcrumbs = append(breadcrumbs, Breadcrumb{Name: "..", Path: ""})
+
+	if subDir != "" {
+		parts := strings.Split(subDir, "/")
+		currentPath := ""
+		for _, part := range parts {
+			if part == "" {
+				continue
+			}
+			if currentPath == "" {
+				currentPath = part
+			} else {
+				currentPath = currentPath + "/" + part
+			}
+			breadcrumbs = append(breadcrumbs, Breadcrumb{
+				Name: part,
+				Path: pathEscapeURI(currentPath) + "/",
+			})
+		}
+	}
+
 	_ = tmpl.Execute(w, map[string]interface{}{
-		"Host":       r.Host,
-		"BaseURL":    hostUrl,
-		"CurrentDir": currentURLPath,
-		"ParentDir":  parentDir,
-		"Items":      allItems,
-		"AppVersion": appVersion,
+		"Host":        r.Host,
+		"BaseURL":     hostUrl,
+		"CurrentDir":  currentURLPath,
+		"ParentDir":   parentDir,
+		"Items":       allItems,
+		"AppVersion":  appVersion,
+		"Breadcrumbs": breadcrumbs,
 	})
 }
 
