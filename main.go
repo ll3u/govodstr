@@ -113,7 +113,7 @@ const htmlTemplate = `
             {{else}}
                 <a href="{{.MpvIntent}}" class="card video-card" target="_blank">
                     <div class="thumbnail-wrapper">
-                        <img src="/thumbnails/{{.FullPath}}.jpg" alt="Vorschau" loading="lazy">
+                        <img src="/thumbnails/{{.FullPath}}.jpg" alt="Vorschau">
                     </div>
                     <div class="info">
                         <div class="meta-text">
