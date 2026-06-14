@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -22,6 +23,7 @@ var (
 	port        = getEnv("PORT", "8080")
 	rateLimitKB = getEnvInt("RATE_LIMIT_KB", 800)
 )
+var thumbnailMutex sync.Mutex
 
 const htmlTemplate = `
 <!DOCTYPE html>
@@ -355,19 +357,28 @@ func handleThumbnail(w http.ResponseWriter, r *http.Request) {
 	escapedName := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/thumbnails/"), ".jpg")
 	fileName, err := url.QueryUnescape(escapedName)
 	if err != nil || fileName == "" || strings.Contains(fileName, "..") {
-		http.Error(w, "invalid", http.StatusBadRequest)
+		http.Error(w, "Ungültig", http.StatusBadRequest)
 		return
 	}
 	cachePath := filepath.Join("./thumbnail_cache", strings.ReplaceAll(url.QueryEscape(fileName), "%2F", "_")+".jpg")
 
-	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
-		cmd := exec.Command("ffmpeg", "-y", "-ss", "00:01:00", "-i", filepath.Join(videoDir, fileName), "-vframes", "1", "-q:v", "4", cachePath)
-		if err := cmd.Run(); err != nil {
-			http.Error(w, "error", http.StatusInternalServerError)
-			return
-		}
+	if _, err := os.Stat(cachePath); err == nil {
+		http.ServeFile(w, r, cachePath)
+		return
 	}
-	http.ServeFile(w, r, cachePath)
+	thumbnailMutex.Lock()
+
+	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
+		cmd := exec.Command("ffmpeg", "-y", "-ss", "00:01:00", "-i", filepath.Join(videoDir, fileName), "-vframes", "1", "-threads", "1", "-q:v", "5", cachePath)
+		_ = cmd.Run()
+	}
+	thumbnailMutex.Unlock()
+
+	if _, err := os.Stat(cachePath); err == nil {
+		http.ServeFile(w, r, cachePath)
+	} else {
+		http.Error(w, "Thumbnail-Generierung fehlgeschlagen", http.StatusInternalServerError)
+	}
 }
 
 func getVideoMetadata(filePath string) (string, string) {
