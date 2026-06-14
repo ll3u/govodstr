@@ -115,11 +115,14 @@ const htmlTemplate = `
                     <div class="thumbnail-wrapper">
                         <img src="/thumbnails/{{.FullPath}}.jpg" alt="Vorschau">
                     </div>
-                                       <div class="info">
+                    <div class="info">
                         <div class="meta-text">
-                            <div class="title" title="{{.Name}}">
-                                {{.Name}}
+                            <div class="title" title="{{if .MetaTitle}}{{.MetaTitle}}{{else}}{{.Name}}{{end}}">
+                                {{if .MetaTitle}}{{.MetaTitle}}{{else}}{{.Name}}{{end}}
                             </div>
+                            {{if .MetaArtist}}
+                                <div class="artist">👤 {{.MetaArtist}}</div>
+                            {{end}}
                         </div>
                     </div>
                 </a>
@@ -205,13 +208,13 @@ func handleCatchAll(w http.ResponseWriter, r *http.Request) {
 
 func renderFolderIndex(w http.ResponseWriter, r *http.Request, subDir string) {
 	if strings.Contains(subDir, "..") {
-		http.Error(w, "invalid path", http.StatusBadRequest)
+		http.Error(w, "Ungültiger Pfad", http.StatusBadRequest)
 		return
 	}
 	targetDir := filepath.Join(videoDir, subDir)
 	files, err := os.ReadDir(targetDir)
 	if err != nil {
-		http.Error(w, "dir not found", http.StatusNotFound)
+		http.Error(w, "Verzeichnis nicht gefunden", http.StatusNotFound)
 		return
 	}
 	parentDir := ""
@@ -228,6 +231,9 @@ func renderFolderIndex(w http.ResponseWriter, r *http.Request, subDir string) {
 	}
 	hostUrl := protocol + r.Host
 
+	// DIE GEHEIMWAFFE: Lädt das JSON oder ergänzt es inkrementell in Millisekunden
+	folderCache := loadOrUpdateFolderCache(targetDir, files)
+
 	var folders []RepoItem
 	var videos []RepoItem
 	for _, f := range files {
@@ -241,20 +247,22 @@ func renderFolderIndex(w http.ResponseWriter, r *http.Request, subDir string) {
 		}
 
 		if f.IsDir() {
-			folders = append(folders, RepoItem{
-				Name:     name,
-				FullPath: relPath,
-				IsDir:    true,
-			})
+			folders = append(folders, RepoItem{Name: name, FullPath: relPath, IsDir: true})
 		} else if strings.HasSuffix(strings.ToLower(name), ".mp4") {
 			escapedURLPath := pathEscapeURI(relPath)
-			streamUrl := fmt.Sprintf("http://%s/stream/%s", r.Host, escapedURLPath)
+			streamUrl := fmt.Sprintf("%s/stream/%s", hostUrl, escapedURLPath)
+
+			// Metadaten direkt aus dem blitzschnellen RAM-Cache ziehen!
+			metaTitle := ""
+			metaArtist := ""
+			if cached, exists := folderCache[name]; exists {
+				metaTitle = cached.Title
+				metaArtist = cached.Artist
+			}
 
 			videos = append(videos, RepoItem{
-				Name:      strings.TrimSuffix(name, ".mp4"),
-				FullPath:  escapedURLPath,
-				IsDir:     false,
-				MpvIntent: template.URL(streamUrl),
+				Name: strings.TrimSuffix(name, ".mp4"), FullPath: escapedURLPath, IsDir: false,
+				MpvIntent: template.URL(streamUrl), MetaTitle: metaTitle, MetaArtist: metaArtist,
 			})
 		}
 	}
@@ -273,11 +281,7 @@ func renderFolderIndex(w http.ResponseWriter, r *http.Request, subDir string) {
 	}
 
 	_ = tmpl.Execute(w, map[string]interface{}{
-		"Host":       r.Host,
-		"BaseURL":    hostUrl,
-		"CurrentDir": currentURLPath,
-		"ParentDir":  parentDir,
-		"Items":      allItems,
+		"Host": r.Host, "BaseURL": hostUrl, "CurrentDir": currentURLPath, "ParentDir": parentDir, "Items": allItems,
 	})
 }
 
@@ -309,7 +313,8 @@ func generateFolderPlaylist(w http.ResponseWriter, r *http.Request, subDir strin
 				relPath = subDir + "/" + f.Name()
 			}
 			escapedPath := pathEscapeURI(relPath)
-			sb.WriteString(fmt.Sprintf("#EXTINF:-1,%s\n", strings.TrimSuffix(f.Name(), ".mp4")))
+			folderCache := loadOrUpdateFolderCache(targetDir, files)
+			sb.WriteString(fmt.Sprintf("#EXTINF:-1,%s\n", folderCache[f.Name()].Title))
 			sb.WriteString(fmt.Sprintf("%s/stream/%s\n", hostUrl, escapedPath))
 		}
 	}
@@ -406,4 +411,51 @@ func getEnvInt(key string, fallback int) int {
 		}
 	}
 	return fallback
+}
+
+type FolderCache map[string]struct {
+	Title  string `json:"title"`
+	Artist string `json:"artist"`
+}
+
+func loadOrUpdateFolderCache(targetDir string, files []os.DirEntry) FolderCache {
+	cachePath := filepath.Join(targetDir, ".data.json")
+	cache := make(FolderCache)
+
+	if data, err := os.ReadFile(cachePath); err == nil {
+		_ = json.Unmarshal(data, &cache)
+	}
+
+	cacheUpdated := false
+
+	for _, f := range files {
+		if f.IsDir() || !strings.HasSuffix(strings.ToLower(f.Name()), ".mp4") {
+			continue
+		}
+		name := f.Name()
+
+		if _, exists := cache[name]; !exists {
+			filePath := filepath.Join(targetDir, name)
+			metaTitle, metaArtist := getVideoMetadata(filePath)
+
+			if metaTitle == "" {
+				metaTitle = strings.TrimSuffix(name, ".mp4")
+			}
+
+			cache[name] = struct {
+				Title  string `json:"title"`
+				Artist string `json:"artist"`
+			}{Title: metaTitle, Artist: metaArtist}
+
+			cacheUpdated = true
+		}
+	}
+
+	if cacheUpdated {
+		if jsonData, err := json.MarshalIndent(cache, "", "  "); err == nil {
+			_ = os.WriteFile(cachePath, jsonData, 0644)
+		}
+	}
+
+	return cache
 }
