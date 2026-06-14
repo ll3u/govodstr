@@ -2,13 +2,14 @@ services:
   mini-streamer:
     image: ghcr.io/ll3u/govodstr:latest
     container_name: govodstr
+    pull_policy: always
     ports:
       - "8085:8080"
     environment:
-      - VIDEO_DIR=/videos
+      - VIDEO_DIR=/vod
       - PORT=8080
       - RATE_LIMIT_KB=800
     volumes:
-      - /DATA/Media:/videos:ro
+      - /DATA/Media:/vod:ro
       - /DATA/AppData/govodstr/cache:/app/thumbnail_cache
     restart: unless-stopped
