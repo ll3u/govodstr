@@ -2,6 +2,12 @@
 
 A minimalist, high-performance, single-binary Video-on-Demand (VOD) streaming server written in Go. It is specifically engineered to host large, downloaded streams from twitch on resource-constrained hardware like the ZimaBlade (ZimaOS) or lightweight NAS, delivering them smoothly to mobile media players.
 
+## 📸 Preview
+
+<p align="center">
+  <img src="assets/govodstr-gui-preview.png" alt="govodstr Mobile UI Preview" width="320">
+</p>
+
 ## 📖 User Story
 
 > As a user who loves watching long video streams in bed on my smartphone, I want a lightweight local streaming server that indexes my media directories instantly, so that I can browse my files via a mobile-optimized, buttonless dark UI and stream them without draining my phone's battery or congesting the local Wi-Fi bandwidth overnight.
