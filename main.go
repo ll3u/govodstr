@@ -347,30 +347,41 @@ func handleStreamRoute(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleThumbnail(w http.ResponseWriter, r *http.Request) {
-	escapedName := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/thumbnails/"), ".jpg")
+	rawPath := r.URL.EscapedPath()
+	escapedName := strings.TrimSuffix(strings.TrimPrefix(rawPath, "/thumbnails/"), ".jpg")
+
 	fileName, err := url.QueryUnescape(escapedName)
 	if err != nil || fileName == "" || strings.Contains(fileName, "..") {
-		http.Error(w, "invalid", http.StatusBadRequest)
+		http.Error(w, "Ungültig", http.StatusBadRequest)
 		return
 	}
-	cachePath := filepath.Join("./thumbnail_cache", strings.ReplaceAll(url.QueryEscape(fileName), "%2F", "_")+".jpg")
+
+	cacheName := strings.ReplaceAll(url.QueryEscape(fileName), "%2F", "_")
+	cachePath := filepath.Join("./thumbnail_cache", cacheName+".jpg")
 
 	if _, err := os.Stat(cachePath); err == nil {
 		http.ServeFile(w, r, cachePath)
 		return
 	}
-	thumbnailMutex.Lock()
 
+	thumbnailMutex.Lock()
 	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
-		cmd := exec.Command("ffmpeg", "-y", "-ss", "00:01:00", "-i", filepath.Join(videoDir, fileName), "-vframes", "1", "-threads", "1", "-q:v", "5", cachePath)
-		_ = cmd.Run()
+		videoPath := filepath.Join(videoDir, fileName)
+
+		cmd := exec.Command("ffmpeg", "-y", "-i", videoPath, "-ss", "00:00:01", "-vframes", "1", "-threads", "1", "-q:v", "5", cachePath)
+
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			fmt.Printf("❌ FFmpeg-Fehler für [%s]: %v\n", fileName, err)
+			fmt.Printf("📋 Output: %s\n", string(output))
+		}
 	}
 	thumbnailMutex.Unlock()
 
 	if _, err := os.Stat(cachePath); err == nil {
 		http.ServeFile(w, r, cachePath)
 	} else {
-		http.Error(w, "generating thumbnails failed", http.StatusInternalServerError)
+		http.Error(w, "Thumbnail nicht verfügbar", http.StatusInternalServerError)
 	}
 }
 
