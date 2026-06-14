@@ -386,7 +386,7 @@ func handleThumbnail(w http.ResponseWriter, r *http.Request) {
 		cancel()
 
 		if err != nil {
-			fmt.Printf("❌ FFmpeg blocked broken [%s]: %v\n", fileName, err)
+			fmt.Printf("❌ ffmpeg blocked broken [%s]: %v\n", fileName, err)
 		}
 	}
 	thumbnailMutex.Unlock()
