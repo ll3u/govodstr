@@ -17,6 +17,8 @@ import (
 	"time"
 )
 
+const appVersion = "v1.0.2"
+
 // global config
 var (
 	videoDir    = getEnv("VIDEO_DIR", "./vod")
@@ -31,7 +33,7 @@ const htmlTemplate = `
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mini Streamer</title>
+    <title>govodstr {{.AppVersion}}</title>
     <style>
         :root {
             --bg-color: #060608;
@@ -279,7 +281,12 @@ func renderFolderIndex(w http.ResponseWriter, r *http.Request, subDir string) {
 	}
 
 	_ = tmpl.Execute(w, map[string]interface{}{
-		"Host": r.Host, "BaseURL": hostUrl, "CurrentDir": currentURLPath, "ParentDir": parentDir, "Items": allItems,
+		"Host":       r.Host,
+		"BaseURL":    hostUrl,
+		"CurrentDir": currentURLPath,
+		"ParentDir":  parentDir,
+		"Items":      allItems,
+		"AppVersion": appVersion,
 	})
 }
 
