@@ -117,11 +117,9 @@ const htmlTemplate = `
                     </div>
                                        <div class="info">
                         <div class="meta-text">
-                            <!-- ÄNDERUNG: Nutzt jetzt starr den Dateinamen .Name statt .MetaTitle -->
                             <div class="title" title="{{.Name}}">
                                 {{.Name}}
                             </div>
-                            <!-- ÄNDERUNG: Die Bedingung {{if .MetaArtist}} wurde entfernt -->
                         </div>
                     </div>
                 </a>
