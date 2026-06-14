@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -376,12 +377,16 @@ func handleThumbnail(w http.ResponseWriter, r *http.Request) {
 	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
 		videoPath := filepath.Join(videoDir, fileName)
 
-		cmd := exec.Command("ffmpeg", "-y", "-i", videoPath, "-ss", "00:00:04", "-vframes", "1", "-threads", "1", "-q:v", "5", cachePath)
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 
-		output, err := cmd.CombinedOutput()
+		// kill ffmpeg when running more then 3 sec
+		cmd := exec.CommandContext(ctx, "ffmpeg", "-y", "-i", videoPath, "-ss", "00:00:03", "-vframes", "1", "-threads", "1", "-q:v", "5", cachePath)
+
+		_, err := cmd.CombinedOutput()
+		cancel()
+
 		if err != nil {
-			fmt.Printf("❌ FFmpeg error [%s]: %v\n", fileName, err)
-			fmt.Printf("📋 output: %s\n", string(output))
+			fmt.Printf("❌ FFmpeg blocked broken [%s]: %v\n", fileName, err)
 		}
 	}
 	thumbnailMutex.Unlock()
@@ -444,6 +449,7 @@ func loadOrUpdateFolderCache(targetDir string, files []os.DirEntry) FolderCache 
 	}
 
 	cacheUpdated := false
+	scannedThisRun := 0
 
 	for _, f := range files {
 		if f.IsDir() || !strings.HasSuffix(strings.ToLower(f.Name()), ".mp4") {
@@ -452,6 +458,10 @@ func loadOrUpdateFolderCache(targetDir string, files []os.DirEntry) FolderCache 
 		name := f.Name()
 
 		if _, exists := cache[name]; !exists {
+			if scannedThisRun >= 10 {
+				continue
+			}
+
 			filePath := filepath.Join(targetDir, name)
 			metaTitle, metaArtist := getVideoMetadata(filePath)
 
@@ -465,6 +475,7 @@ func loadOrUpdateFolderCache(targetDir string, files []os.DirEntry) FolderCache 
 			}{Title: metaTitle, Artist: metaArtist}
 
 			cacheUpdated = true
+			scannedThisRun++
 		}
 	}
 
