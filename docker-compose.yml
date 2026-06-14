@@ -1,29 +1,14 @@
-version: '3.8'
-
 services:
   mini-streamer:
-    # 1. Das fertig gebaute Image aus deiner GitHub Container Registry laden
-    image: ghcr.io/dein-github-name/govodstr:latest
-    container_name: mini-streamer
-    
-    # 2. Port-Mapping (Außen erreichbar auf Port 8085, intern leitet Docker an den Go-Port 8080 weiter)
+    image: ghcr.io/ll3u/govodstr:latest
+    container_name: govodstr
     ports:
       - "8085:8080"
-      
-    # 3. Konfigurations-Parameter als Umgebungsvariablen
     environment:
       - VIDEO_DIR=/videos
       - PORT=8080
-      - RATE_LIMIT_KB=800  # 800 KB/s nach dem 50MB-Burst (Akkuschonender Stream im Bett)
-      
-    # 4. Verzeichnis-Freigaben (Volumes)
+      - RATE_LIMIT_KB=800
     volumes:
-      # LINKS: Der echte Pfad zu deinen MP4-Streams auf deiner NAS / ZimaBlade
-      # RECHTS: Der interne Container-Pfad für das Go-Binary (Muss auf /videos bleiben)
-      - /DATA/AppData/media/yt:/videos:ro  # :ro steht für Read-Only (Zusätzliche Sicherheit)
-      
-      # Verzeichnis, in dem Go die extrahierten JPEGs speichert, damit sie bei Container-Updates nicht gelöscht werden
-      - /DATA/AppData/mini-streamer/cache:/app/thumbnail_cache
-      
-    # 5. Zuverlässigkeits-Richtlinie
+      - /DATA/Media:/videos:ro
+      - /DATA/AppData/govodstr/cache:/app/thumbnail_cache
     restart: unless-stopped
