@@ -115,14 +115,13 @@ const htmlTemplate = `
                     <div class="thumbnail-wrapper">
                         <img src="/thumbnails/{{.FullPath}}.jpg" alt="Vorschau">
                     </div>
-                    <div class="info">
+                                       <div class="info">
                         <div class="meta-text">
-                            <div class="title" title="{{if .MetaTitle}}{{.MetaTitle}}{{else}}{{.Name}}{{end}}">
-                                {{if .MetaTitle}}{{.MetaTitle}}{{else}}{{.Name}}{{end}}
+                            <!-- ÄNDERUNG: Nutzt jetzt starr den Dateinamen .Name statt .MetaTitle -->
+                            <div class="title" title="{{.Name}}">
+                                {{.Name}}
                             </div>
-                            {{if .MetaArtist}}
-                                <div class="artist">👤 {{.MetaArtist}}</div>
-                            {{end}}
+                            <!-- ÄNDERUNG: Die Bedingung {{if .MetaArtist}} wurde entfernt -->
                         </div>
                     </div>
                 </a>
@@ -250,21 +249,14 @@ func renderFolderIndex(w http.ResponseWriter, r *http.Request, subDir string) {
 				IsDir:    true,
 			})
 		} else if strings.HasSuffix(strings.ToLower(name), ".mp4") {
-			filePath := filepath.Join(videoDir, relPath)
-			metaTitle, metaArtist := getVideoMetadata(filePath)
-			if metaTitle == "" {
-				metaTitle = strings.TrimSuffix(name, ".mp4")
-			}
 			escapedURLPath := pathEscapeURI(relPath)
-			streamUrl := fmt.Sprintf("%s/stream/%s", hostUrl, escapedURLPath)
+			streamUrl := fmt.Sprintf("http://%s/stream/%s", r.Host, escapedURLPath)
 
 			videos = append(videos, RepoItem{
-				Name:       strings.TrimSuffix(name, ".mp4"),
-				FullPath:   escapedURLPath,
-				IsDir:      false,
-				MpvIntent:  template.URL(streamUrl),
-				MetaTitle:  metaTitle,
-				MetaArtist: metaArtist,
+				Name:      strings.TrimSuffix(name, ".mp4"),
+				FullPath:  escapedURLPath,
+				IsDir:     false,
+				MpvIntent: template.URL(streamUrl),
 			})
 		}
 	}
