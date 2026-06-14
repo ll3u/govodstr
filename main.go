@@ -27,7 +27,7 @@ var thumbnailMutex sync.Mutex
 
 const htmlTemplate = `
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -208,13 +208,13 @@ func handleCatchAll(w http.ResponseWriter, r *http.Request) {
 
 func renderFolderIndex(w http.ResponseWriter, r *http.Request, subDir string) {
 	if strings.Contains(subDir, "..") {
-		http.Error(w, "Ungültiger Pfad", http.StatusBadRequest)
+		http.Error(w, "invalid path", http.StatusBadRequest)
 		return
 	}
 	targetDir := filepath.Join(videoDir, subDir)
 	files, err := os.ReadDir(targetDir)
 	if err != nil {
-		http.Error(w, "Verzeichnis nicht gefunden", http.StatusNotFound)
+		http.Error(w, "directory not found", http.StatusNotFound)
 		return
 	}
 	parentDir := ""
@@ -231,7 +231,6 @@ func renderFolderIndex(w http.ResponseWriter, r *http.Request, subDir string) {
 	}
 	hostUrl := protocol + r.Host
 
-	// DIE GEHEIMWAFFE: Lädt das JSON oder ergänzt es inkrementell in Millisekunden
 	folderCache := loadOrUpdateFolderCache(targetDir, files)
 
 	var folders []RepoItem
@@ -252,7 +251,6 @@ func renderFolderIndex(w http.ResponseWriter, r *http.Request, subDir string) {
 			escapedURLPath := pathEscapeURI(relPath)
 			streamUrl := fmt.Sprintf("%s/stream/%s", hostUrl, escapedURLPath)
 
-			// Metadaten direkt aus dem blitzschnellen RAM-Cache ziehen!
 			metaTitle := ""
 			metaArtist := ""
 			if cached, exists := folderCache[name]; exists {
@@ -287,7 +285,7 @@ func renderFolderIndex(w http.ResponseWriter, r *http.Request, subDir string) {
 
 func generateFolderPlaylist(w http.ResponseWriter, r *http.Request, subDir string) {
 	if strings.Contains(subDir, "..") {
-		http.Error(w, "Ungültiger Pfad", http.StatusBadRequest)
+		http.Error(w, "invalid path", http.StatusBadRequest)
 		return
 	}
 	targetDir := filepath.Join(videoDir, subDir)
@@ -324,7 +322,7 @@ func generateFolderPlaylist(w http.ResponseWriter, r *http.Request, subDir strin
 func handleStreamRoute(w http.ResponseWriter, r *http.Request) {
 	relPath := strings.TrimPrefix(r.URL.Path, "/stream/")
 	if relPath == "" || strings.Contains(relPath, "..") {
-		http.Error(w, "Pfad ungültig", http.StatusBadRequest)
+		http.Error(w, "invalid path", http.StatusBadRequest)
 		return
 	}
 	filePath := filepath.Join(videoDir, relPath)
@@ -352,7 +350,7 @@ func handleThumbnail(w http.ResponseWriter, r *http.Request) {
 	escapedName := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/thumbnails/"), ".jpg")
 	fileName, err := url.QueryUnescape(escapedName)
 	if err != nil || fileName == "" || strings.Contains(fileName, "..") {
-		http.Error(w, "Ungültig", http.StatusBadRequest)
+		http.Error(w, "invalid", http.StatusBadRequest)
 		return
 	}
 	cachePath := filepath.Join("./thumbnail_cache", strings.ReplaceAll(url.QueryEscape(fileName), "%2F", "_")+".jpg")
@@ -372,7 +370,7 @@ func handleThumbnail(w http.ResponseWriter, r *http.Request) {
 	if _, err := os.Stat(cachePath); err == nil {
 		http.ServeFile(w, r, cachePath)
 	} else {
-		http.Error(w, "Thumbnail-Generierung fehlgeschlagen", http.StatusInternalServerError)
+		http.Error(w, "generating thumbnails failed", http.StatusInternalServerError)
 	}
 }
 
