@@ -1,34 +1,34 @@
 # ==========================================
-# STUFE 1: Go-Code kompilieren (Build-Umgebung mit Go 1.26)
+# STAGE 1: Compile Go Code (Build Environment)
 # ==========================================
 FROM golang:1.26-alpine AS builder
 
 WORKDIR /app
 
-# Kopiere die Mod-Dateien (falls vorhanden), um Caching zu nutzen
-# Falls du noch keine go.mod hast, erzeugt das Skript eine beim Build
+# Copy module files (if available) to utilize Docker layer caching
+# If go.mod does not exist yet, it will be initialized during the build
 COPY go.mod* go.sum* ./
 RUN if [ ! -f go.mod ]; then go mod init govodstr; fi
 
-# Kopiere die main.go und baue das statische Linux-Binary
+# Copy the source code and build a statically linked, optimized Linux binary
 COPY main.go .
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o streamer main.go
 
 # ==========================================
-# STUFE 2: Minimales Laufzeit-Image mit FFmpeg
+# STAGE 2: Minimal Runtime Image with FFmpeg
 # ==========================================
 FROM alpine:latest
 
-# Installiere FFmpeg & FFprobe (wichtig für Metadaten und Vorschaubilder)
+# Install FFmpeg & FFprobe (required for video metadata and on-demand thumbnails)
 RUN apk add --no-cache ffmpeg tzdata
 
 WORKDIR /app
 
-# Kopiere das fertige Go-Binary aus der ersten Stufe
+# Copy the compiled Go binary from the builder stage
 COPY --from=builder /app/streamer .
 
-# Exponiere den Standard-Port
+# Expose the internal port (will be mapped via docker-compose)
 EXPOSE 8080
 
-# Startbefehl des Containers
+# Container entry point execution command
 CMD ["./streamer"]
