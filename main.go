@@ -101,7 +101,7 @@ const htmlTemplate = `
         <a href="{{.BaseURL}}/{{.CurrentDir}}playlist.m3u8"><code>{{.BaseURL}}/{{.CurrentDir}}playlist.m3u8</code></a>
     </div>
     {{if .CurrentDir}}
-        <a href="/{{.ParentDir}}" class="btn-back">⬅ Zurück</a>
+        <a href="/{{.ParentDir}}" class="btn-back">⬅ back</a>
     {{end}}
     <div class="grid">
         {{range .Items}}
@@ -113,7 +113,7 @@ const htmlTemplate = `
             {{else}}
                 <a href="{{.MpvIntent}}" class="card video-card" target="_blank">
                     <div class="thumbnail-wrapper">
-                        <img src="/thumbnails/{{.FullPath}}.jpg" alt="Vorschau">
+                        <img src="/thumbnails/{{.FullPath}}.jpg" alt="preview">
                     </div>
                     <div class="info">
                         <div class="meta-text">
