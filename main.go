@@ -376,17 +376,16 @@ func handleThumbnail(w http.ResponseWriter, r *http.Request) {
 	thumbnailMutex.Lock()
 	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
 		videoPath := filepath.Join(videoDir, fileName)
-
+		// kill ffmpeg when running more then 3 sec
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 
-		// kill ffmpeg when running more then 3 sec
-		cmd := exec.CommandContext(ctx, "ffmpeg", "-y", "-i", videoPath, "-ss", "00:00:03", "-vframes", "1", "-threads", "1", "-q:v", "5", cachePath)
+		cmd := exec.CommandContext(ctx, "ffmpeg", "-y", "-i", videoPath, "-ss", "00:00:04", "-vframes", "1", "-threads", "1", "-q:v", "5", cachePath)
 
-		_, err := cmd.CombinedOutput()
+		_, ffmpegErr := cmd.CombinedOutput()
 		cancel()
 
-		if err != nil {
-			fmt.Printf("❌ ffmpeg blocked broken [%s]: %v\n", fileName, err)
+		if ffmpegErr != nil {
+			fmt.Printf("❌  ffmpeg blocked broken [%s]: %v\n", fileName, ffmpegErr)
 		}
 	}
 	thumbnailMutex.Unlock()
