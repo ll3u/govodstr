@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-const appVersion = "v1.0.4"
+const appVersion = "v1.0.5"
 
 // global config
 var (
