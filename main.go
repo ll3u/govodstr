@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-const appVersion = "v1.0.7"
+const appVersion = "v1.0.9"
 
 // global config
 var (
@@ -94,7 +94,8 @@ const htmlTemplate = `
         .info { padding: 8px; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
         .meta-text { display: flex; flex-direction: column; gap: 1px; }
         .title { font-size: 0.85rem; font-weight: 600; color: #fff; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 2.3rem; line-height: 1.3; }
-        .artist { font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .artist { font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; justify-content: space-between; align-items: center; width: 100%;}
+		.date { font-size: 0.7rem; color: var(--text-muted); padding-left: 5px;font-weight:bold; }
 
 		.breadcrumbs { 
             font-size: 0.8rem; 
@@ -146,9 +147,16 @@ const htmlTemplate = `
                             <div class="title" title="{{if .MetaTitle}}{{.MetaTitle}}{{else}}{{.Name}}{{end}}">
                                 {{if .MetaTitle}}{{.MetaTitle}}{{else}}{{.Name}}{{end}}
                             </div>
-                            {{if .MetaArtist}}
-                                <div class="artist">👤 {{.MetaArtist}}</div>
-                            {{end}}
+                            <div class="artist">
+								{{if .MetaArtist}}
+									<span>✨ {{.MetaArtist}}</span>
+								{{else}}
+									<span></span>
+								{{end}}
+								{{if .MetaDate}}
+									<span class="date">{{.MetaDate}}</span>
+								{{end}}
+							</div>
                         </div>
                     </div>
                 </a>
@@ -166,6 +174,7 @@ type RepoItem struct {
 	MpvIntent  template.URL
 	MetaTitle  string
 	MetaArtist string
+	MetaDate   string
 }
 
 type FFProbeOutput struct {
@@ -173,6 +182,7 @@ type FFProbeOutput struct {
 		Tags struct {
 			Title  string `json:"title"`
 			Artist string `json:"artist"`
+			Date   string `json:"creation_time"`
 		} `json:"tags"`
 	} `json:"format"`
 }
@@ -290,14 +300,16 @@ func renderFolderIndex(w http.ResponseWriter, r *http.Request, subDir string) {
 
 			metaTitle := ""
 			metaArtist := ""
+			metaDate := ""
 			if cached, exists := folderCache[name]; exists {
 				metaTitle = cached.Title
 				metaArtist = cached.Artist
+				metaDate = formatDate(cached.Date)
 			}
 
 			videos = append(videos, RepoItem{
 				Name: strings.TrimSuffix(name, ".mp4"), FullPath: escapedURLPath, IsDir: false,
-				MpvIntent: template.URL(streamUrl), MetaTitle: metaTitle, MetaArtist: metaArtist,
+				MpvIntent: template.URL(streamUrl), MetaTitle: metaTitle, MetaArtist: metaArtist, MetaDate: metaDate,
 			})
 		}
 	}
@@ -459,17 +471,17 @@ func handleThumbnail(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func getVideoMetadata(filePath string) (string, string) {
-	cmd := exec.Command("ffprobe", "-v", "error", "-show_entries", "format_tags=title,artist", "-of", "json", filePath)
+func getVideoMetadata(filePath string) (string, string, string) {
+	cmd := exec.Command("ffprobe", "-v", "error", "-show_entries", "format_tags=title,artist,creation_time", "-of", "json", filePath)
 	out, err := cmd.Output()
 	if err != nil {
-		return "", ""
+		return "", "", ""
 	}
 	var data FFProbeOutput
 	if err := json.Unmarshal(out, &data); err != nil {
-		return "", ""
+		return "", "", ""
 	}
-	return data.Format.Tags.Title, data.Format.Tags.Artist
+	return data.Format.Tags.Title, data.Format.Tags.Artist, data.Format.Tags.Date
 }
 
 func pathEscapeURI(rawPath string) string {
@@ -499,6 +511,7 @@ func getEnvInt(key string, fallback int) int {
 type FolderCache map[string]struct {
 	Title  string `json:"title"`
 	Artist string `json:"artist"`
+	Date   string `json:"creation_time"`
 }
 
 func loadOrUpdateFolderCache(targetDir string, files []os.DirEntry) FolderCache {
@@ -528,7 +541,7 @@ func loadOrUpdateFolderCache(targetDir string, files []os.DirEntry) FolderCache 
 			}
 
 			filePath := filepath.Join(targetDir, name)
-			metaTitle, metaArtist := getVideoMetadata(filePath)
+			metaTitle, metaArtist, metaDate := getVideoMetadata(filePath)
 
 			if metaTitle == "" {
 				metaTitle = strings.TrimSuffix(name, ".mp4")
@@ -537,7 +550,8 @@ func loadOrUpdateFolderCache(targetDir string, files []os.DirEntry) FolderCache 
 			cache[name] = struct {
 				Title  string `json:"title"`
 				Artist string `json:"artist"`
-			}{Title: metaTitle, Artist: metaArtist}
+				Date   string `json:"creation_time"`
+			}{Title: metaTitle, Artist: metaArtist, Date: metaDate}
 
 			cacheUpdated = true
 			scannedThisRun++
@@ -551,4 +565,12 @@ func loadOrUpdateFolderCache(targetDir string, files []os.DirEntry) FolderCache 
 	}
 
 	return cache
+}
+
+func formatDate(input string) string {
+	parsedTime, err := time.Parse(time.RFC3339Nano, input)
+	if err != nil {
+		return ""
+	}
+	return parsedTime.Format("2006")
 }
